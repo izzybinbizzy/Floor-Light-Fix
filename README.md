@@ -9,7 +9,8 @@ When a light leaves the scene (a torch put away, a spell's hand light gone, a ch
 the scene's list of lights but leaves it on the light lists of the surfaces it lit; only the light's own destructor clears
 those. So while anything still holds the light - the game itself, or a mod that keeps a reference to it - the floors and
 walls it touched keep drawing it: a glow left on the ground where nothing is. It was measured on the game's own lighting and
-on ENB, and has been seen by eye on Community Shaders forks.
+on ENB. The author has seen a stuck light by eye on several Community Shaders forks; six test runs, real fights among them,
+have not caught it there yet, and this plugin is not proven to clear it there.
 
 ## The fix
 Two call hooks on the game's own erase calls where a light leaves the scene's lists (the per-light pass and the drain of
