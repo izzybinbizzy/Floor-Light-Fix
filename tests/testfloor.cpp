@@ -32,7 +32,9 @@ namespace
 #define CHECK(x) Check((x), #x, __LINE__)
 
 	// the fewest checks a whole run makes (raise it when checks are added)
-	constexpr int kFloor = 23;
+	constexpr int kFloor = 24;
+	// the 1.6.1170 exe's preferred base, where the offsets in SiteMath::Game1170 count from
+	constexpr std::uintptr_t kBase = 0x140000000;
 
 	using SiteMath::CallTarget;
 	using SiteMath::Erased;
@@ -56,10 +58,6 @@ namespace
 		// the farthest a rel32 reaches, both ways
 		CHECK(CallTarget(Call(std::numeric_limits<std::int32_t>::max()), site) == site + 5 + 0x7FFFFFFF);
 		CHECK(CallTarget(Call(std::numeric_limits<std::int32_t>::min()), site) == site + 5 - 0x80000000ull);
-		// the site of 1.6.1170's per-light pass onto its erase, as read in the exe: 0x1414A1540 + 0x732 -> 0x1414A83F0
-		constexpr std::uintptr_t pass = 0x1414A1540 + 0x732;
-		constexpr std::uintptr_t erase = 0x1414A83F0;
-		CHECK(CallTarget(Call(static_cast<std::int32_t>(erase - (pass + 5))), pass) == erase);
 		// anything but E8 is not a call this was written for: a jump, a nop, a breakpoint
 		CHECK(!CallTarget(Call(0x100, 0xE9), site).has_value());
 		CHECK(!CallTarget(Call(0x100, 0x90), site).has_value());
@@ -68,9 +66,9 @@ namespace
 
 	void Judging()
 	{
-		constexpr std::uintptr_t start = 0x140000000;
+		constexpr std::uintptr_t start = kBase;
 		constexpr std::uintptr_t end = 0x142400000;
-		constexpr std::uintptr_t erase = 0x1414A83F0;
+		constexpr std::uintptr_t erase = kBase + SiteMath::Game1170::kErase;
 		CHECK(Judge(erase, erase, start, end) == Site::kGame);
 		// inside the game but not its erase: refused
 		CHECK(Judge(erase + 0x10, erase, start, end) == Site::kOther);
@@ -97,6 +95,17 @@ namespace
 		CHECK(Erased(0xFFFFFFFFu, 2, 10) == Range(10, 10));
 		CHECK(Erased(5, 0, 10) == Range(5, 5));
 	}
+
+	// the 5 bytes at each hooked call site, copied out of the unpacked 1.6.1170 exe at its preferred base: each must read as a call
+	// onto the erase, so a wrong offset in SiteMath::Game1170 fails here
+	void RealSites()
+	{
+		using namespace SiteMath::Game1170;
+		constexpr std::array<std::uint8_t, 5> passBytes{ 0xE8, 0x79, 0x67, 0x00, 0x00 };
+		constexpr std::array<std::uint8_t, 5> drainBytes{ 0xE8, 0x47, 0x6F, 0x00, 0x00 };
+		CHECK(CallTarget(passBytes, kBase + kPass + kPassCall) == kBase + kErase);
+		CHECK(CallTarget(drainBytes, kBase + kDrain + kDrainCall) == kBase + kErase);
+	}
 }
 
 int main()
@@ -104,6 +113,7 @@ int main()
 	Targets();
 	Judging();
 	Ranges();
+	RealSites();
 	const bool enough = gPassed + gFailed >= kFloor;
 	std::printf("testfloor: %d passed, %d failed, %d checks (floor %d)%s\n", gPassed, gFailed, gPassed + gFailed, kFloor,
 		enough ? "" : " - FEWER CHECKS RAN THAN THE FLOOR");

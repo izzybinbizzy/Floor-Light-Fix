@@ -17,13 +17,10 @@ namespace
 	using Lights = RE::BSTArray<RE::NiPointer<RE::BSLight>>;
 	using ClearFn = void(RE::BSLight*);
 
+	namespace Game = SiteMath::Game1170;
+
 	// the only game these were read in; on any other nothing is looked up or written
 	constexpr REL::Version kReadIn{ 1, 6, 1170, 0 };
-	// where the 1.6.1170 exe has each function (Address Library ids 106419, 106335, 106333, 108285)
-	constexpr std::size_t kErase = 0x14A83F0;
-	constexpr std::size_t kPass = 0x14A1540;
-	constexpr std::size_t kDrain = 0x14A1370;
-	constexpr std::size_t kClear = 0x1509A00;
 
 	std::atomic<std::uint64_t> gCleared{ 0 };
 	REL::Relocation<ClearFn>   gClearGeometries{};
@@ -90,9 +87,9 @@ namespace
 				game.string("."));
 			return;
 		}
-		const auto                                   erase = REL::Offset(kErase).address();
-		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::Offset(kPass).address() + 0x732 },
-			{ "the RemoveLight queue drain", REL::Offset(kDrain).address() + 0x134 } };
+		const auto                                   erase = REL::Offset(Game::kErase).address();
+		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::Offset(Game::kPass).address() + Game::kPassCall },
+			{ "the RemoveLight queue drain", REL::Offset(Game::kDrain).address() + Game::kDrainCall } };
 		const auto                                   image = GameImage();
 		const char*                                  what[2]{};
 		for (int i = 0; i < 2; ++i) {
@@ -102,7 +99,7 @@ namespace
 				return;
 			}
 		}
-		gClearGeometries = REL::Relocation<ClearFn>{ REL::Offset(kClear).address() };
+		gClearGeometries = REL::Relocation<ClearFn>{ REL::Offset(Game::kClear).address() };
 		auto& trampoline = SKSE::GetTrampoline();
 		Erase<0>::original = trampoline.write_call<5>(sites[0].second, Erase<0>::Thunk);
 		Erase<1>::original = trampoline.write_call<5>(sites[1].second, Erase<1>::Thunk);

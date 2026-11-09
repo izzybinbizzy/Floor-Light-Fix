@@ -2,8 +2,8 @@
 // Copyright (C) 2026 izzydoingit
 // GPL-3.0-or-later; see LICENSE.
 //
-// The game-free parts: reading what a hooked call site holds before anything is written there, and which entries an erase
-// takes out. Tested without the game by tests/testfloor.cpp.
+// The game-free parts: where the 1.6.1170 exe has what the plugin hooks, reading what a hooked call site holds before anything
+// is written there, and which entries an erase takes out. Tested without the game by tests/testfloor.cpp.
 #pragma once
 
 #include <algorithm>
@@ -15,6 +15,21 @@
 
 namespace SiteMath
 {
+	// offsets from the base of the 1.6.1170 exe, the only game these were read in (Address Library ids in brackets)
+	namespace Game1170
+	{
+		// the array erase (106419)
+		inline constexpr std::uintptr_t kErase = 0x14A83F0;
+		// the per-light pass (106335) and its call onto the erase
+		inline constexpr std::uintptr_t kPass = 0x14A1540;
+		inline constexpr std::uintptr_t kPassCall = 0x732;
+		// the drain of RemoveLight's queue (106333) and its call onto the erase
+		inline constexpr std::uintptr_t kDrain = 0x14A1370;
+		inline constexpr std::uintptr_t kDrainCall = 0x134;
+		// BSLight::ClearGeometries (108285)
+		inline constexpr std::uintptr_t kClear = 0x1509A00;
+	}
+
 	// what a call site holds
 	enum class Site
 	{
