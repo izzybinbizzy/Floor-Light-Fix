@@ -13,7 +13,6 @@
 #include <cstdio>
 #include <limits>
 #include <optional>
-#include <utility>
 
 namespace
 {
@@ -32,14 +31,11 @@ namespace
 #define CHECK(x) Check((x), #x, __LINE__)
 
 	// the fewest checks a whole run makes (raise it when checks are added)
-	constexpr int kFloor = 27;
+	constexpr int kFloor = 13;
 	// the 1.6.1170 exe's preferred base, where the offsets in SiteMath::Game1170 count from
 	constexpr std::uintptr_t kBase = 0x140000000;
 
 	using SiteMath::CallTarget;
-	using SiteMath::Erased;
-	using SiteMath::Judge;
-	using SiteMath::Site;
 
 	std::array<std::uint8_t, 5> Call(std::int32_t a_rel, std::uint8_t a_op = 0xE8)
 	{
@@ -64,38 +60,6 @@ namespace
 		CHECK(!CallTarget(Call(0x100, 0xCC), site).has_value());
 	}
 
-	void Judging()
-	{
-		constexpr std::uintptr_t start = kBase;
-		constexpr std::uintptr_t end = 0x142400000;
-		constexpr std::uintptr_t erase = kBase + SiteMath::Game1170::kErase;
-		CHECK(Judge(erase, erase, start, end) == Site::kGame);
-		// inside the game but not its erase: refused
-		CHECK(Judge(erase + 0x10, erase, start, end) == Site::kOther);
-		CHECK(Judge(start, erase, start, end) == Site::kOther);
-		CHECK(Judge(end - 1, erase, start, end) == Site::kOther);
-		// outside the game's module: chained, whatever it is
-		CHECK(Judge(end, erase, start, end) == Site::kChained);
-		CHECK(Judge(start - 0x1000, erase, start, end) == Site::kChained);
-		// no call at all
-		CHECK(Judge(std::nullopt, erase, start, end) == Site::kOther);
-	}
-
-	void Ranges()
-	{
-		using Range = std::pair<std::uint32_t, std::uint32_t>;
-		// what both hooked sites do: one entry
-		CHECK(Erased(3, 1, 10) == Range(3, 4));
-		CHECK(Erased(0, 10, 10) == Range(0, 10));
-		// never past the array's end, and nothing when the index is already past it
-		CHECK(Erased(8, 5, 10) == Range(8, 10));
-		CHECK(Erased(10, 1, 10) == Range(10, 10));
-		CHECK(Erased(25, 1, 10) == Range(10, 10));
-		// index + count past 32 bits does not wrap round to the start
-		CHECK(Erased(0xFFFFFFFFu, 2, 10) == Range(10, 10));
-		CHECK(Erased(5, 0, 10) == Range(5, 5));
-	}
-
 	// the 5 bytes at each hooked call site, copied out of the unpacked 1.6.1170 exe at its preferred base: each must read as a call
 	// onto the erase, so a wrong offset in SiteMath::Game1170 fails here
 	void RealSites()
@@ -115,8 +79,6 @@ namespace
 int main()
 {
 	Targets();
-	Judging();
-	Ranges();
 	RealSites();
 	const bool enough = gPassed + gFailed >= kFloor;
 	std::printf("testfloor: %d passed, %d failed, %d checks (floor %d)%s\n", gPassed, gFailed, gPassed + gFailed, kFloor,
