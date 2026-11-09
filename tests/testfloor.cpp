@@ -58,7 +58,8 @@ namespace
 		CHECK(CallTarget(Call(std::numeric_limits<std::int32_t>::min()), site) == site + 5 - 0x80000000ull);
 		// the site of 1.6.1170's per-light pass onto its erase, as read in the exe: 0x1414A1540 + 0x732 -> 0x1414A83F0
 		constexpr std::uintptr_t pass = 0x1414A1540 + 0x732;
-		CHECK(CallTarget(Call(static_cast<std::int32_t>(0x1414A83F0 - (pass + 5))), pass) == 0x1414A83F0);
+		constexpr std::uintptr_t erase = 0x1414A83F0;
+		CHECK(CallTarget(Call(static_cast<std::int32_t>(erase - (pass + 5))), pass) == erase);
 		// anything but E8 is not a call this was written for: a jump, a nop, a breakpoint
 		CHECK(!CallTarget(Call(0x100, 0xE9), site).has_value());
 		CHECK(!CallTarget(Call(0x100, 0x90), site).has_value());
