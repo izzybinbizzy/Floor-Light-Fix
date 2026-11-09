@@ -17,12 +17,12 @@ namespace
 
 	REL::Relocation<void(RE::BSLight*)> gClearGeometries{};
 
-	template <int N>
+	// both sites were checked to be the game's own call onto the same erase, so one thunk and one original serve both
 	struct Erase
 	{
 		static void Thunk(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count)
 		{
-			// both sites erase one light (read in the exe)
+			// both sites pass a count of 1 (read in the exe), and the site check pins that code
 			if (a_array && a_index < a_array->size()) {
 				if (auto* light = (*a_array)[a_index].get(); light && !light->geomList.empty()) {
 					gClearGeometries(light);
@@ -52,8 +52,8 @@ namespace
 		}
 		gClearGeometries = REL::Relocation<void(RE::BSLight*)>{ REL::Offset(Game::kClear).address() };
 		auto& trampoline = SKSE::GetTrampoline();
-		Erase<0>::original = trampoline.write_call<5>(sites[0].first, Erase<0>::Thunk);
-		Erase<1>::original = trampoline.write_call<5>(sites[1].first, Erase<1>::Thunk);
+		Erase::original = trampoline.write_call<5>(sites[0].first, Erase::Thunk);
+		static_cast<void>(trampoline.write_call<5>(sites[1].first, Erase::Thunk));
 		SKSE::log::info("installed at {} and {}", sites[0].second, sites[1].second);
 	}
 }
@@ -72,6 +72,10 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	try {
 		Install();
 	} catch (...) {
+		try {
+			SKSE::log::error("the install stopped on an exception (low memory?): the fix may be in at one site, or none");
+		} catch (...) {
+		}
 	}
 	return true;
 }

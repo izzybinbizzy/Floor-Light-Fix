@@ -6,11 +6,9 @@
 #pragma once
 
 #include <RE/Skyrim.h>
-#include <REX/W32/KERNEL32.h>
 #include <SKSE/SKSE.h>
 
 #include <array>
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
