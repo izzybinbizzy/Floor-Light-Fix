@@ -6,6 +6,7 @@
 #pragma once
 
 #include <RE/Skyrim.h>
+#include <REX/W32/KERNEL32.h>
 #include <SKSE/SKSE.h>
 
 #include <algorithm>
@@ -15,6 +16,7 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <utility>

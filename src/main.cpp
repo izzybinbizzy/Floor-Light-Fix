@@ -51,25 +51,32 @@ namespace
 		static inline REL::Relocation<decltype(&Thunk)> original{};
 	};
 
-	// the game's own module, from its section table: a call that leaves it is another plugin's hook
+	// an Address Library id and where the 1.6.1170 exe has it (read there): a library that maps one elsewhere installs nothing
+	struct ReadAt
+	{
+		std::uint64_t id{ 0 };
+		std::size_t   offset{ 0 };
+	};
+	constexpr ReadAt kErase{ 106419, 0x14A83F0 };
+	constexpr ReadAt kPass{ 106335, 0x14A1540 };
+	constexpr ReadAt kDrain{ 106333, 0x14A1370 };
+	constexpr ReadAt kClear{ 108285, 0x1509A00 };
+
+	// the game's whole image, from its own PE header: a call that leaves it is another plugin's hook
 	std::pair<std::uintptr_t, std::uintptr_t> GameImage()
 	{
-		const auto&    module = REL::Module::get();
-		std::uintptr_t end = module.base();
-		for (std::size_t i = 0; i < REL::Segment::total; ++i) {
-			const auto segment = module.segment(static_cast<REL::Segment::Name>(i));
-			end = std::max(end, segment.address() + segment.size());
-		}
-		return { module.base(), end };
+		const auto  base = REL::Module::get().base();
+		const auto* dos = reinterpret_cast<const REX::W32::IMAGE_DOS_HEADER*>(base);
+		const auto* nt = reinterpret_cast<const REX::W32::IMAGE_NT_HEADERS64*>(base + static_cast<std::uintptr_t>(dos->lfanew));
+		return { base, base + nt->optionalHeader.imageSize };
 	}
 
 	// the site must still be a 5-byte relative call: onto the game's erase, or onto another plugin's hook of the same call (a chain)
-	const char* CheckSite(std::uintptr_t a_site, std::uintptr_t a_erase)
+	const char* CheckSite(std::uintptr_t a_site, std::uintptr_t a_erase, std::pair<std::uintptr_t, std::uintptr_t> a_image)
 	{
 		std::array<std::uint8_t, 5> bytes{};
 		std::memcpy(bytes.data(), reinterpret_cast<const void*>(a_site), bytes.size());
-		const auto [start, end] = GameImage();
-		switch (SiteMath::Judge(SiteMath::CallTarget(bytes, a_site), a_erase, start, end)) {
+		switch (SiteMath::Judge(SiteMath::CallTarget(bytes, a_site), a_erase, a_image.first, a_image.second)) {
 		case SiteMath::Site::kGame:
 			return "the game's erase";
 		case SiteMath::Site::kChained:
@@ -79,31 +86,42 @@ namespace
 		}
 	}
 
-	void Install()
+	// -> true when both hooks are in place; otherwise one log line says why and nothing was written
+	bool Install()
 	{
 		const auto game = REL::Module::get().version();
 		if (game != kReadIn) {
 			SKSE::log::warn("not installed: the call sites were read in Skyrim {} only, and this game is {}", kReadIn.string("."),
 				game.string("."));
-			return;
+			return false;
 		}
-		// every id is looked up before anything is judged or written (1.6.1170's Address Library holds all four)
-		const auto                                   erase = REL::ID(106419).address();
-		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::ID(106335).address() + 0x732 },
-			{ "the RemoveLight queue drain", REL::ID(106333).address() + 0x134 } };
-		gClearGeometries = REL::Relocation<ClearFn>{ REL::ID(108285) };
-		const char* what[2]{};
-		for (int i = 0; i < 2; ++i) {
-			what[i] = CheckSite(sites[i].second, erase);
-			if (!what[i]) {
-				SKSE::log::warn("not installed: {} does not hold the call this was written for", sites[i].first);
-				return;
+		// every id is looked up and compared with the exe before anything is judged or written
+		for (const auto& read : { kErase, kPass, kDrain, kClear }) {
+			const auto offset = REL::ID(read.id).offset();
+			if (offset != read.offset) {
+				SKSE::log::warn("not installed: the Address Library puts id {} at +{:X}, the game has it at +{:X}", read.id, offset,
+					read.offset);
+				return false;
 			}
 		}
+		const auto                                   erase = REL::ID(kErase.id).address();
+		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::ID(kPass.id).address() + 0x732 },
+			{ "the RemoveLight queue drain", REL::ID(kDrain.id).address() + 0x134 } };
+		const auto                                   image = GameImage();
+		const char*                                  what[2]{};
+		for (int i = 0; i < 2; ++i) {
+			what[i] = CheckSite(sites[i].second, erase, image);
+			if (!what[i]) {
+				SKSE::log::warn("not installed: {} does not hold the call this was written for", sites[i].first);
+				return false;
+			}
+		}
+		gClearGeometries = REL::Relocation<ClearFn>{ REL::ID(kClear.id) };
 		auto& trampoline = SKSE::GetTrampoline();
 		Erase<0>::original = trampoline.write_call<5>(sites[0].second, Erase<0>::Thunk);
 		Erase<1>::original = trampoline.write_call<5>(sites[1].second, Erase<1>::Thunk);
 		SKSE::log::info("installed at {} (onto {}) and {} (onto {})", sites[0].first, what[0], sites[1].first, what[1]);
+		return true;
 	}
 
 	void OnMessage(SKSE::MessagingInterface::Message* a_msg)
@@ -138,8 +156,9 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 		SKSE::log::info("Floor Light Fix {} - a light leaving the scene is taken off the floors it lit", ver);
 	} catch (...) {
 	}
+	bool installed = false;
 	try {
-		Install();
+		installed = Install();
 	} catch (...) {
 		// no call in the install throws but a log line; say that it stopped, if the log still can
 		try {
@@ -147,6 +166,9 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 		} catch (...) {
 		}
 	}
-	SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
+	// the count on each save only where the fix runs, so a log of a game it is not in never reads as if it were
+	if (installed) {
+		SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
+	}
 	return true;
 }
