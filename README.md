@@ -18,9 +18,9 @@ call the same pass already makes for a hidden light. Each site is checked before
 unexpected leaves the game untouched and says why in `FloorLightFix.log`. Nothing runs while no light leaves the scene.
 
 ## Requires
-SKSE and Address Library for SKSE Plugins. Skyrim 1.6.1170 only: on any other version (SE 1.5.97 or another 1.6 build) it
-loads, installs nothing and says why in its log, and there is no VR build. The addresses for other versions have not been
-read.
+SKSE. Skyrim 1.6.1170 only: it uses the addresses read in that game's exe (no Address Library lookups), and on any other
+version (SE 1.5.97 or another 1.6 build) it loads, installs nothing and says why in its log. There is no VR build. The
+addresses for other versions have not been read.
 
 ## Building
 `build.bat` (git, xmake 3 and the Visual Studio C++ tools): CommonLib at the pinned commit, the DLL, then the off-game

@@ -17,8 +17,13 @@ namespace
 	using Lights = RE::BSTArray<RE::NiPointer<RE::BSLight>>;
 	using ClearFn = void(RE::BSLight*);
 
-	// the only game the call sites were read in: on any other the Address Library ids are never looked up
+	// the only game these were read in; on any other nothing is looked up or written
 	constexpr REL::Version kReadIn{ 1, 6, 1170, 0 };
+	// where the 1.6.1170 exe has each function (Address Library ids 106419, 106335, 106333, 108285)
+	constexpr std::size_t kErase = 0x14A83F0;
+	constexpr std::size_t kPass = 0x14A1540;
+	constexpr std::size_t kDrain = 0x14A1370;
+	constexpr std::size_t kClear = 0x1509A00;
 
 	std::atomic<std::uint64_t> gCleared{ 0 };
 	REL::Relocation<ClearFn>   gClearGeometries{};
@@ -30,9 +35,9 @@ namespace
 			return;
 		}
 		// both sites erase one light (r8d 1, read in the exe); a longer erase is cleared whole all the same
-		const std::uint64_t end = std::min<std::uint64_t>(std::uint64_t{ a_index } + a_count, a_array->size());
-		for (std::uint64_t i = a_index; i < end; ++i) {
-			auto* light = (*a_array)[static_cast<std::uint32_t>(i)].get();
+		const auto [first, last] = SiteMath::Erased(a_index, a_count, a_array->size());
+		for (auto i = first; i < last; ++i) {
+			auto* light = (*a_array)[i].get();
 			if (light && !light->geomList.empty()) {
 				gClearGeometries(light);
 				gCleared.fetch_add(1, std::memory_order_relaxed);
@@ -50,17 +55,6 @@ namespace
 		}
 		static inline REL::Relocation<decltype(&Thunk)> original{};
 	};
-
-	// an Address Library id and where the 1.6.1170 exe has it (read there): a library that maps one elsewhere installs nothing
-	struct ReadAt
-	{
-		std::uint64_t id{ 0 };
-		std::size_t   offset{ 0 };
-	};
-	constexpr ReadAt kErase{ 106419, 0x14A83F0 };
-	constexpr ReadAt kPass{ 106335, 0x14A1540 };
-	constexpr ReadAt kDrain{ 106333, 0x14A1370 };
-	constexpr ReadAt kClear{ 108285, 0x1509A00 };
 
 	// the game's whole image, from its own PE header: a call that leaves it is another plugin's hook
 	std::pair<std::uintptr_t, std::uintptr_t> GameImage()
@@ -95,18 +89,9 @@ namespace
 				game.string("."));
 			return false;
 		}
-		// every id is looked up and compared with the exe before anything is judged or written
-		for (const auto& read : { kErase, kPass, kDrain, kClear }) {
-			const auto offset = REL::ID(read.id).offset();
-			if (offset != read.offset) {
-				SKSE::log::warn("not installed: the Address Library puts id {} at +{:X}, the game has it at +{:X}", read.id, offset,
-					read.offset);
-				return false;
-			}
-		}
-		const auto                                   erase = REL::ID(kErase.id).address();
-		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::ID(kPass.id).address() + 0x732 },
-			{ "the RemoveLight queue drain", REL::ID(kDrain.id).address() + 0x134 } };
+		const auto                                   erase = REL::Offset(kErase).address();
+		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::Offset(kPass).address() + 0x732 },
+			{ "the RemoveLight queue drain", REL::Offset(kDrain).address() + 0x134 } };
 		const auto                                   image = GameImage();
 		const char*                                  what[2]{};
 		for (int i = 0; i < 2; ++i) {
@@ -116,7 +101,7 @@ namespace
 				return false;
 			}
 		}
-		gClearGeometries = REL::Relocation<ClearFn>{ REL::ID(kClear.id) };
+		gClearGeometries = REL::Relocation<ClearFn>{ REL::Offset(kClear).address() };
 		auto& trampoline = SKSE::GetTrampoline();
 		Erase<0>::original = trampoline.write_call<5>(sites[0].second, Erase<0>::Thunk);
 		Erase<1>::original = trampoline.write_call<5>(sites[1].second, Erase<1>::Thunk);

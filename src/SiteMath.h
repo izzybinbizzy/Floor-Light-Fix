@@ -2,14 +2,16 @@
 // Copyright (C) 2026 izzydoingit
 // GPL-3.0-or-later; see LICENSE.
 //
-// The game-free part: reading what a hooked call site holds before anything is written there. Tested without the game by
-// tests/testfloor.cpp.
+// The game-free parts: reading what a hooked call site holds before anything is written there, and which entries an erase
+// takes out. Tested without the game by tests/testfloor.cpp.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <utility>
 
 namespace SiteMath
 {
@@ -47,5 +49,14 @@ namespace SiteMath
 		}
 		const bool inGame = *a_target >= a_imageStart && *a_target < a_imageEnd;
 		return inGame ? Site::kOther : Site::kChained;
+	}
+
+	// the entries [first, last) an erase of a_count from a_index takes out of an array of a_size, kept inside the array
+	[[nodiscard]] constexpr std::pair<std::uint32_t, std::uint32_t> Erased(std::uint32_t a_index, std::uint32_t a_count,
+		std::uint32_t a_size) noexcept
+	{
+		const std::uint64_t first = std::min<std::uint64_t>(a_index, a_size);
+		const std::uint64_t last = std::min<std::uint64_t>(std::uint64_t{ a_index } + a_count, a_size);
+		return { static_cast<std::uint32_t>(first), static_cast<std::uint32_t>(std::max(first, last)) };
 	}
 }
