@@ -17,19 +17,26 @@ namespace
 	using Lights = RE::BSTArray<RE::NiPointer<RE::BSLight>>;
 	using ClearFn = void(RE::BSLight*);
 
-	std::atomic<std::uint64_t> gCleared{ 0 };
-	// resolved at load, so an id missing from the Address Library stops the install, never a light pass
-	REL::Relocation<ClearFn> gClearGeometries{};
+	// the only game the call sites were read in: on any other the Address Library ids are never looked up
+	constexpr REL::Version kReadIn{ 1, 6, 1170, 0 };
 
-	void ClearFirst(Lights* a_array, std::uint32_t a_index)
+	std::atomic<std::uint64_t> gCleared{ 0 };
+	REL::Relocation<ClearFn>   gClearGeometries{};
+
+	// nothing here can throw: a bounds-checked read, the game's own call and an atomic add
+	void ClearFirst(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count) noexcept
 	{
-		if (!a_array || a_index >= a_array->size()) {
+		if (!a_array) {
 			return;
 		}
-		auto* light = (*a_array)[a_index].get();
-		if (light && !light->geomList.empty()) {
-			gClearGeometries(light);
-			gCleared.fetch_add(1, std::memory_order_relaxed);
+		// both sites erase one light (r8d 1, read in the exe); a longer erase is cleared whole all the same
+		const std::uint64_t end = std::min<std::uint64_t>(std::uint64_t{ a_index } + a_count, a_array->size());
+		for (std::uint64_t i = a_index; i < end; ++i) {
+			auto* light = (*a_array)[static_cast<std::uint32_t>(i)].get();
+			if (light && !light->geomList.empty()) {
+				gClearGeometries(light);
+				gCleared.fetch_add(1, std::memory_order_relaxed);
+			}
 		}
 	}
 
@@ -38,10 +45,10 @@ namespace
 	{
 		static void Thunk(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count)
 		{
-			ClearFirst(a_array, a_index);
+			ClearFirst(a_array, a_index, a_count);
 			original(a_array, a_index, a_count);
 		}
-		static inline REL::Relocation<decltype(&Thunk)> original;
+		static inline REL::Relocation<decltype(&Thunk)> original{};
 	};
 
 	// the game's own module, from its section table: a call that leaves it is another plugin's hook
@@ -74,22 +81,25 @@ namespace
 
 	void Install()
 	{
-		if (!REL::Module::IsAE()) {
-			SKSE::log::warn("not installed: the two call sites were read in 1.6.1170 only (SE and VR not read)");
+		const auto game = REL::Module::get().version();
+		if (game != kReadIn) {
+			SKSE::log::warn("not installed: the call sites were read in Skyrim {} only, and this game is {}", kReadIn.string("."),
+				game.string("."));
 			return;
 		}
+		// every id is looked up before anything is judged or written (1.6.1170's Address Library holds all four)
 		const auto                                   erase = REL::ID(106419).address();
 		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::ID(106335).address() + 0x732 },
 			{ "the RemoveLight queue drain", REL::ID(106333).address() + 0x134 } };
-		const char*                                  what[2]{};
+		gClearGeometries = REL::Relocation<ClearFn>{ REL::ID(108285) };
+		const char* what[2]{};
 		for (int i = 0; i < 2; ++i) {
 			what[i] = CheckSite(sites[i].second, erase);
 			if (!what[i]) {
-				SKSE::log::warn("not installed: {} does not hold the call this was written for (another game version?)", sites[i].first);
+				SKSE::log::warn("not installed: {} does not hold the call this was written for", sites[i].first);
 				return;
 			}
 		}
-		gClearGeometries = REL::Relocation<ClearFn>{ REL::ID(108285) };
 		auto& trampoline = SKSE::GetTrampoline();
 		Erase<0>::original = trampoline.write_call<5>(sites[0].second, Erase<0>::Thunk);
 		Erase<1>::original = trampoline.write_call<5>(sites[1].second, Erase<1>::Thunk);
@@ -131,6 +141,11 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	try {
 		Install();
 	} catch (...) {
+		// no call in the install throws but a log line; say that it stopped, if the log still can
+		try {
+			SKSE::log::error("the install stopped on an exception (low memory?): the fix may not be in place");
+		} catch (...) {
+		}
 	}
 	SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
 	return true;

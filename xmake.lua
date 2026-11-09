@@ -11,7 +11,7 @@ set_runtimes("MT")
 add_rules("mode.releasedbg")
 set_defaultmode("releasedbg")
 
--- the call sites were read in the 1.6.1170 exe only: the DLL loads on SE and does nothing there; no VR build until VR is read
+-- the call sites were read in the 1.6.1170 exe only: on any other version the DLL loads and does nothing; no VR build until VR is read
 set_config("skyrim_se", true)
 set_config("skyrim_ae", true)
 set_config("skyrim_vr", false)
