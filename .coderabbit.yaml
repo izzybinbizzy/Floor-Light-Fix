@@ -1,0 +1,27 @@
+# CodeRabbit settings for this repository (https://docs.coderabbit.ai/reference/configuration)
+language: en-US
+reviews:
+  profile: assertive
+  high_level_summary: true
+  poem: false
+  request_changes_workflow: false
+  review_status: true
+  auto_review:
+    enabled: true
+    auto_pause_after_reviewed_commits: 0
+    drafts: false
+    base_branches:
+      - main
+  path_instructions:
+    - path: "src/**"
+      instructions: >-
+        SKSE plugin for Skyrim Anniversary Edition (1.6.1170) built on CommonLibSSE-NG. It hooks two call sites
+        inside the game's own light passes. Check that each site is verified before anything is written there, that
+        nothing is installed on a runtime whose addresses were not read, that the hook path cannot throw, allocate or
+        block, that every pointer from the game is null-checked, and that nothing runs on a timer or every frame.
+    - path: "tests/**"
+      instructions: >-
+        Off-game tests of the game-free code in src/SiteMath.h. Check that every case is meaningful and that the run
+        fails when fewer checks ran than its floor.
+chat:
+  auto_reply: true
