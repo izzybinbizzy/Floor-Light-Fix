@@ -20,11 +20,11 @@ namespace
 	// both sites were checked to be the game's own call onto the same erase, so one thunk and one original serve both
 	struct Erase
 	{
-		static void Thunk(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count)
+		static void Thunk(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count) noexcept
 		{
-			// both sites pass a count of 1 (read in the exe), and the site check pins that code
-			if (a_array && a_index < a_array->size()) {
-				if (auto* light = (*a_array)[a_index].get(); light && !light->geomList.empty()) {
+			// every light the erase takes, though both sites pass a count of 1 (read in the exe)
+			for (auto i = a_index; a_array && i < a_array->size() && i - a_index < a_count; ++i) {
+				if (auto* light = (*a_array)[i].get(); light && !light->geomList.empty()) {
 					gClearGeometries(light);
 				}
 			}
@@ -73,7 +73,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 		Install();
 	} catch (...) {
 		try {
-			SKSE::log::error("the install stopped on an exception (low memory?): the fix may be in at one site, or none");
+			SKSE::log::error("the install stopped on an exception (low memory?): the fix may be in at both sites, one or none");
 		} catch (...) {
 		}
 	}
