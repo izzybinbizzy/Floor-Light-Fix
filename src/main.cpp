@@ -80,14 +80,15 @@ namespace
 		}
 	}
 
-	// -> true when both hooks are in place; otherwise one log line says why and nothing was written
-	bool Install()
+	// a_installed turns true the moment both hooks are written, so a log line that throws after it cannot hide them; when it stays
+	// false, one log line says why and nothing was written
+	void Install(bool& a_installed)
 	{
 		const auto game = REL::Module::get().version();
 		if (game != kReadIn) {
 			SKSE::log::warn("not installed: the call sites were read in Skyrim {} only, and this game is {}", kReadIn.string("."),
 				game.string("."));
-			return false;
+			return;
 		}
 		const auto                                   erase = REL::Offset(kErase).address();
 		const std::pair<const char*, std::uintptr_t> sites[] = { { "the per-light pass", REL::Offset(kPass).address() + 0x732 },
@@ -98,15 +99,15 @@ namespace
 			what[i] = CheckSite(sites[i].second, erase, image);
 			if (!what[i]) {
 				SKSE::log::warn("not installed: {} does not hold the call this was written for", sites[i].first);
-				return false;
+				return;
 			}
 		}
 		gClearGeometries = REL::Relocation<ClearFn>{ REL::Offset(kClear).address() };
 		auto& trampoline = SKSE::GetTrampoline();
 		Erase<0>::original = trampoline.write_call<5>(sites[0].second, Erase<0>::Thunk);
 		Erase<1>::original = trampoline.write_call<5>(sites[1].second, Erase<1>::Thunk);
+		a_installed = true;
 		SKSE::log::info("installed at {} (onto {}) and {} (onto {})", sites[0].first, what[0], sites[1].first, what[1]);
-		return true;
 	}
 
 	void OnMessage(SKSE::MessagingInterface::Message* a_msg)
@@ -133,27 +134,21 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	if (!RuntimeGuard::RightGame("Floor Light Fix", "Floor Light Fix", "")) {
 		return true;
 	}
-	// the start line and the install's log lines are the only work here that can throw (low memory): none leaves the plugin
-	try {
-		// the version the DLL declares (xmake.lua set_version), never a typed number
-		const auto* decl = SKSE::PluginDeclaration::GetSingleton();
-		const auto  ver = decl ? std::format("{}.{}", decl->GetVersion().major(), decl->GetVersion().minor()) : std::string("?");
-		SKSE::log::info("Floor Light Fix {} - a light leaving the scene is taken off the floors it lit", ver);
-	} catch (...) {
-	}
+	// the install's log lines are the only work here that can throw (low memory): none leaves the plugin
 	bool installed = false;
 	try {
-		installed = Install();
+		Install(installed);
 	} catch (...) {
-		// no call in the install throws but a log line; say that it stopped, if the log still can
-		try {
-			SKSE::log::error("the install stopped on an exception (low memory?): the fix may not be in place");
-		} catch (...) {
+		if (!installed) {
+			try {
+				SKSE::log::error("not installed: the install stopped on an exception (low memory?)");
+			} catch (...) {
+			}
 		}
 	}
 	// the count on each save only where the fix runs, so a log of a game it is not in never reads as if it were
-	if (installed) {
-		SKSE::GetMessagingInterface()->RegisterListener(OnMessage);
+	if (auto* messaging = SKSE::GetMessagingInterface(); installed && messaging) {
+		messaging->RegisterListener(OnMessage);
 	}
 	return true;
 }
