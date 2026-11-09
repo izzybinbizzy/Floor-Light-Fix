@@ -15,8 +15,10 @@ have not caught it there yet, and this plugin is not proven to clear it there.
 ## The fix
 Two call hooks on the game's own erase calls where a light leaves the scene's lists (the per-light pass and the drain of
 the RemoveLight queue). Before the erase, the plugin calls the game's own `BSLight::ClearGeometries` on that light - the
-call the same pass already makes for a hidden light. Each site is checked before anything is written there: anything
-unexpected leaves the game untouched and says why in `FloorLightFix.log`. Nothing runs while no light leaves the scene.
+call the same pass already makes for a hidden light. Each site is checked before anything is written there. A call that
+leaves the game's image is kept as the next call, whatever it is (most likely another plugin's hook; only where it goes
+is read, and the log says so). Anything else unexpected leaves the game untouched and says why in `FloorLightFix.log`.
+Nothing runs while no light leaves the scene.
 
 ## Requires
 SKSE. Skyrim 1.6.1170 only: it uses the addresses read in that game's exe (no Address Library lookups), and on any other

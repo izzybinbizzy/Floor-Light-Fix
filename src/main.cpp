@@ -53,7 +53,7 @@ namespace
 		static inline REL::Relocation<decltype(&Thunk)> original{};
 	};
 
-	// the game's whole image, from its own PE header: a call that leaves it is another plugin's hook
+	// the game's whole image, from its own PE header: the site's call is judged against it
 	std::pair<std::uintptr_t, std::uintptr_t> GameImage()
 	{
 		const auto  base = REL::Module::get().base();
@@ -62,7 +62,7 @@ namespace
 		return { base, base + nt->optionalHeader.imageSize };
 	}
 
-	// the site must still be a 5-byte relative call: onto the game's erase, or onto another plugin's hook of the same call (a chain)
+	// the site must still be a 5-byte relative call: onto the game's erase, or out of the game's image, which is kept as the next call
 	const char* CheckSite(std::uintptr_t a_site, std::uintptr_t a_erase, std::pair<std::uintptr_t, std::uintptr_t> a_image)
 	{
 		std::array<std::uint8_t, 5> bytes{};
@@ -71,15 +71,14 @@ namespace
 		case SiteMath::Site::kGame:
 			return "the game's erase";
 		case SiteMath::Site::kChained:
-			return "another plugin's hook of the same call (chained)";
+			return "a call out of the game's image, most likely another plugin's hook of the same call (chained)";
 		default:
 			return nullptr;
 		}
 	}
 
-	// a_installed turns true the moment both hooks are written, so a log line that throws after it cannot hide them; when it stays
-	// false, one log line says why and nothing was written
-	void Install(bool& a_installed)
+	// a_written counts each hook the moment it is in, so a throw at any point is reported as what it left behind
+	void Install(int& a_written)
 	{
 		const auto game = REL::Module::get().version();
 		if (game != kReadIn) {
@@ -102,8 +101,9 @@ namespace
 		gClearGeometries = REL::Relocation<ClearFn>{ REL::Offset(Game::kClear).address() };
 		auto& trampoline = SKSE::GetTrampoline();
 		Erase<0>::original = trampoline.write_call<5>(sites[0].second, Erase<0>::Thunk);
+		++a_written;
 		Erase<1>::original = trampoline.write_call<5>(sites[1].second, Erase<1>::Thunk);
-		a_installed = true;
+		++a_written;
 		SKSE::log::info("installed at {} (onto {}) and {} (onto {})", sites[0].first, what[0], sites[1].first, what[1]);
 	}
 
@@ -132,19 +132,19 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 		return true;
 	}
 	// the install's log lines are the only work here that can throw (low memory): none leaves the plugin
-	bool installed = false;
+	int written = 0;
 	try {
-		Install(installed);
+		Install(written);
 	} catch (...) {
-		if (!installed) {
+		if (written < 2) {
 			try {
-				SKSE::log::error("not installed: the install stopped on an exception (low memory?)");
+				SKSE::log::error("the install stopped on an exception (low memory?) with {} of its 2 hooks written", written);
 			} catch (...) {
 			}
 		}
 	}
 	// the count on each save only where the fix runs, so a log of a game it is not in never reads as if it were
-	if (auto* messaging = SKSE::GetMessagingInterface(); installed && messaging) {
+	if (auto* messaging = SKSE::GetMessagingInterface(); written > 0 && messaging) {
 		messaging->RegisterListener(OnMessage);
 	}
 	return true;

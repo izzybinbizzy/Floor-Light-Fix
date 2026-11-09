@@ -32,7 +32,7 @@ namespace
 #define CHECK(x) Check((x), #x, __LINE__)
 
 	// the fewest checks a whole run makes (raise it when checks are added)
-	constexpr int kFloor = 24;
+	constexpr int kFloor = 27;
 	// the 1.6.1170 exe's preferred base, where the offsets in SiteMath::Game1170 count from
 	constexpr std::uintptr_t kBase = 0x140000000;
 
@@ -74,7 +74,7 @@ namespace
 		CHECK(Judge(erase + 0x10, erase, start, end) == Site::kOther);
 		CHECK(Judge(start, erase, start, end) == Site::kOther);
 		CHECK(Judge(end - 1, erase, start, end) == Site::kOther);
-		// outside the game's module: another plugin's hook, chained
+		// outside the game's module: chained, whatever it is
 		CHECK(Judge(end, erase, start, end) == Site::kChained);
 		CHECK(Judge(start - 0x1000, erase, start, end) == Site::kChained);
 		// no call at all
@@ -103,6 +103,10 @@ namespace
 		using namespace SiteMath::Game1170;
 		constexpr std::array<std::uint8_t, 5> passBytes{ 0xE8, 0x79, 0x67, 0x00, 0x00 };
 		constexpr std::array<std::uint8_t, 5> drainBytes{ 0xE8, 0x47, 0x6F, 0x00, 0x00 };
+		// the addresses themselves, so all the offsets moving together cannot pass the relative checks below
+		CHECK(kBase + kPass + kPassCall == 0x1414A1C72);
+		CHECK(kBase + kDrain + kDrainCall == 0x1414A14A4);
+		CHECK(kBase + kErase == 0x1414A83F0);
 		CHECK(CallTarget(passBytes, kBase + kPass + kPassCall) == kBase + kErase);
 		CHECK(CallTarget(drainBytes, kBase + kDrain + kDrainCall) == kBase + kErase);
 	}

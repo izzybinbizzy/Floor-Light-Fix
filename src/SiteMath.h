@@ -35,7 +35,7 @@ namespace SiteMath
 	{
 		// the 5-byte call onto the game's own function
 		kGame,
-		// a 5-byte call into another module: another plugin's hook of the same call
+		// a 5-byte call out of the game's image, most likely another plugin's hook of the same call; only where it goes was read
 		kChained,
 		// anything else: another game version, or a site rewritten some other way
 		kOther
@@ -52,7 +52,7 @@ namespace SiteMath
 		return a_site + 5 + static_cast<std::uintptr_t>(static_cast<std::intptr_t>(rel));
 	}
 
-	// a_imageStart / a_imageEnd: the game's own module, so a call that leaves it is another plugin's hook
+	// a_imageStart / a_imageEnd: the game's own module. An SKSE trampoline is not in any module, so no module check can tell a hook apart
 	[[nodiscard]] inline Site Judge(std::optional<std::uintptr_t> a_target, std::uintptr_t a_expected, std::uintptr_t a_imageStart,
 		std::uintptr_t a_imageEnd) noexcept
 	{

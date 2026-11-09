@@ -29,6 +29,8 @@ target("FloorLightFix", function()
         name = "FloorLightFix",
         author = "izzydoingit",
         description = "Floor Light Fix - a light that leaves the scene is taken off the floors it lit",
+        -- no Address Library lookups: declared so, SKSE lets any game version reach the version check, which logs why it stays idle
+        options = { signature_scanning = true },
     })
     add_files("src/*.cpp")
     add_headerfiles("src/*.h")
