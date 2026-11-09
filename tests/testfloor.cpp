@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <limits>
 #include <optional>
+#include <utility>
 
 namespace
 {
@@ -31,7 +32,7 @@ namespace
 #define CHECK(x) Check((x), #x, __LINE__)
 
 	// the fewest checks a whole run makes (raise it when checks are added)
-	constexpr int kFloor = 13;
+	constexpr int kFloor = 23;
 	// the 1.6.1170 exe's preferred base, where the offsets in SiteMath::Game1170 count from
 	constexpr std::uintptr_t kBase = 0x140000000;
 
@@ -74,12 +75,33 @@ namespace
 		CHECK(CallTarget(passBytes, kBase + kPass + kPassCall) == kBase + kErase);
 		CHECK(CallTarget(drainBytes, kBase + kDrain + kDrainCall) == kBase + kErase);
 	}
+
+	// the lights the hook clears are exactly the ones the game's erase takes
+	void Ranges()
+	{
+		using SiteMath::ErasedRange;
+		using R = std::pair<std::uint32_t, std::uint32_t>;
+		// what both hooked sites pass: one light
+		CHECK(ErasedRange(3, 1, 8) == R(3, 4));
+		CHECK(ErasedRange(0, 1, 1) == R(0, 1));
+		CHECK(ErasedRange(7, 1, 8) == R(7, 8));
+		// a count equal to the size takes the whole array, whatever the index
+		CHECK(ErasedRange(2, 5, 5) == R(0, 5));
+		// a range running past the end stops at it; nothing past it, nothing for a count of 0 or an empty array
+		CHECK(ErasedRange(6, 4, 8) == R(6, 8));
+		CHECK(ErasedRange(9, 1, 8) == R(8, 8));
+		CHECK(ErasedRange(3, 0, 8) == R(3, 3));
+		CHECK(ErasedRange(0, 0, 0) == R(0, 0));
+		CHECK(ErasedRange(std::numeric_limits<std::uint32_t>::max(), 2, 8) == R(8, 8));
+		CHECK(ErasedRange(4, std::numeric_limits<std::uint32_t>::max(), 8) == R(4, 8));
+	}
 }
 
 int main()
 {
 	Targets();
 	RealSites();
+	Ranges();
 	const bool enough = gPassed + gFailed >= kFloor;
 	std::printf("testfloor: %d passed, %d failed, %d checks (floor %d)%s\n", gPassed, gFailed, gPassed + gFailed, kFloor,
 		enough ? "" : " - FEWER CHECKS RAN THAN THE FLOOR");

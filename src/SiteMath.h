@@ -5,10 +5,12 @@
 // Where the 1.6.1170 exe has what the plugin hooks, and the read of a call site, kept game-free for tests/testfloor.cpp.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <utility>
 
 namespace SiteMath
 {
@@ -36,5 +38,17 @@ namespace SiteMath
 		std::int32_t rel = 0;
 		std::memcpy(&rel, a_bytes.data() + 1, sizeof(rel));
 		return a_site + 5 + static_cast<std::uintptr_t>(static_cast<std::intptr_t>(rel));
+	}
+
+	// [first, last) of the lights the game's erase takes: a count equal to the size takes them all, whatever the index (read in the exe)
+	[[nodiscard]] constexpr std::pair<std::uint32_t, std::uint32_t> ErasedRange(std::uint32_t a_index, std::uint32_t a_count, std::uint32_t a_size) noexcept
+	{
+		if (a_count == a_size) {
+			return { 0, a_size };
+		}
+		if (a_index >= a_size) {
+			return { a_size, a_size };
+		}
+		return { a_index, a_index + (std::min)(a_count, a_size - a_index) };
 	}
 }

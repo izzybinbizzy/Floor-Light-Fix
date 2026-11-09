@@ -20,13 +20,19 @@ namespace
 	// both sites were checked to be the game's own call onto the same erase, so one thunk and one original serve both
 	struct Erase
 	{
-		static void Thunk(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count) noexcept
+		static void Thunk(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count)
 		{
-			// every light the erase takes, though both sites pass a count of 1 (read in the exe)
-			for (auto i = a_index; a_array && i < a_array->size() && i - a_index < a_count; ++i) {
-				if (auto* light = (*a_array)[i].get(); light && !light->geomList.empty()) {
-					gClearGeometries(light);
+			// every light the erase takes, though both sites pass a count of 1 (read in the exe); nothing may leave a hook
+			try {
+				if (a_array) {
+					const auto [first, last] = SiteMath::ErasedRange(a_index, a_count, a_array->size());
+					for (auto i = first; i < last; ++i) {
+						if (auto* light = (*a_array)[i].get(); light && !light->geomList.empty()) {
+							gClearGeometries(light);
+						}
+					}
 				}
+			} catch (...) {
 			}
 			original(a_array, a_index, a_count);
 		}
