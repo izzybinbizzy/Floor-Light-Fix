@@ -40,7 +40,8 @@ namespace SiteMath
 		return a_site + 5 + static_cast<std::uintptr_t>(static_cast<std::intptr_t>(rel));
 	}
 
-	// [first, last) of the lights the game's erase takes: a count equal to the size takes them all, whatever the index (read in the exe)
+	// [first, last) of the lights the game's erase takes: a count equal to the size takes them all, whatever the index (read in the
+	// exe); otherwise the range from the index, clamped to the array here (the game's erase does not clamp it)
 	[[nodiscard]] constexpr std::pair<std::uint32_t, std::uint32_t> ErasedRange(std::uint32_t a_index, std::uint32_t a_count, std::uint32_t a_size) noexcept
 	{
 		if (a_count == a_size) {

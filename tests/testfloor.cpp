@@ -32,7 +32,7 @@ namespace
 #define CHECK(x) Check((x), #x, __LINE__)
 
 	// the fewest checks a whole run makes (raise it when checks are added)
-	constexpr int kFloor = 23;
+	constexpr int kFloor = 25;
 	// the 1.6.1170 exe's preferred base, where the offsets in SiteMath::Game1170 count from
 	constexpr std::uintptr_t kBase = 0x140000000;
 
@@ -76,7 +76,7 @@ namespace
 		CHECK(CallTarget(drainBytes, kBase + kDrain + kDrainCall) == kBase + kErase);
 	}
 
-	// the lights the hook clears are exactly the ones the game's erase takes
+	// the lights the hook clears: the ones the game's erase takes, clamped to the array (the game does not clamp; both sites pass 1)
 	void Ranges()
 	{
 		using SiteMath::ErasedRange;
@@ -87,6 +87,8 @@ namespace
 		CHECK(ErasedRange(7, 1, 8) == R(7, 8));
 		// a count equal to the size takes the whole array, whatever the index
 		CHECK(ErasedRange(2, 5, 5) == R(0, 5));
+		CHECK(ErasedRange(8, 8, 8) == R(0, 8));
+		CHECK(ErasedRange(std::numeric_limits<std::uint32_t>::max(), 8, 8) == R(0, 8));
 		// a range running past the end stops at it; nothing past it, nothing for a count of 0 or an empty array
 		CHECK(ErasedRange(6, 4, 8) == R(6, 8));
 		CHECK(ErasedRange(9, 1, 8) == R(8, 8));

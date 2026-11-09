@@ -22,7 +22,8 @@ namespace
 	{
 		static void Thunk(Lights* a_array, std::uint32_t a_index, std::uint32_t a_count)
 		{
-			// every light the erase takes, though both sites pass a count of 1 (read in the exe); nothing may leave a hook
+			// every light the erase takes, though both sites pass a count of 1 (read in the exe); no C++ exception may leave a hook
+			// (a fault inside the game's own call is not one, and passes this catch)
 			try {
 				if (a_array) {
 					const auto [first, last] = SiteMath::ErasedRange(a_index, a_count, a_array->size());
