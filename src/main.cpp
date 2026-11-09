@@ -58,25 +58,28 @@ namespace
 			}
 		}
 		gClearGeometries = REL::Relocation<void(RE::BSLight*)>{ REL::Offset(Game::kClear).address() };
+		// the original is in place before either call points at the thunk; both sites were read calling this same erase
+		Erase::original = REL::Relocation<decltype(&Erase::Thunk)>{ erase };
 		auto& trampoline = SKSE::GetTrampoline();
-		Erase::original = trampoline.write_call<5>(sites[0].first, Erase::Thunk);
-		static_cast<void>(trampoline.write_call<5>(sites[1].first, Erase::Thunk));
+		for (const auto& site : sites) {
+			static_cast<void>(trampoline.write_call<5>(site.first, Erase::Thunk));
+		}
 		SKSE::log::info("installed at {} and {}", sites[0].second, sites[1].second);
 	}
 }
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
-	SKSE::InitInfo info{};
-	info.trampoline = true;
-	info.trampolineSize = 64;
-	SKSE::Init(a_skse, info);
-	// the wrong game: loaded but idle (a false here adds SKSE's own "exit game?" box over the guard's)
-	if (!RuntimeGuard::RightGame("Floor Light Fix", "Floor Light Fix", "")) {
-		return true;
-	}
-	// a log line can throw on low memory, and nothing may leave the plugin into the game
+	// nothing may leave the plugin into the game: the log's own setup or a log line can throw (a locked log file, low memory)
 	try {
+		SKSE::InitInfo info{};
+		info.trampoline = true;
+		info.trampolineSize = 64;
+		SKSE::Init(a_skse, info);
+		// the wrong game: loaded but idle (a false here adds SKSE's own "exit game?" box over the guard's)
+		if (!RuntimeGuard::RightGame("Floor Light Fix", "Floor Light Fix", "")) {
+			return true;
+		}
 		Install();
 	} catch (...) {
 		try {

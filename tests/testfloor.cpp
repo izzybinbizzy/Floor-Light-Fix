@@ -2,7 +2,7 @@
 // Copyright (C) 2026 izzydoingit
 // GPL-3.0-or-later; see LICENSE.
 //
-// PC Runner\plugin build.py builds and runs them (xmake target testfloor), then again under clang's address and
+// build.bat builds and runs them (xmake target testfloor); the author's own build runs them again under clang's address and
 // undefined-behavior checkers. The run fails when a check fails, AND when fewer checks ran than kFloor (a test that stopped
 // part way proves nothing).
 

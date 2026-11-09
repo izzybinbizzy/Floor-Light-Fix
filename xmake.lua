@@ -41,7 +41,7 @@ target("FloorLightFix", function()
 end)
 
 -- the game-free part (src/SiteMath.h), tested without the game: xmake build testfloor && xmake run testfloor
--- (PC Runner\plugin build.py builds and runs it, then again under clang's address + undefined-behavior checkers)
+-- (build.bat builds and runs it; the author's own build runs it again under clang's address + undefined-behavior checkers)
 target("testfloor", function()
     set_kind("binary")
     set_default(false)
